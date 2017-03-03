@@ -1,0 +1,43 @@
+#!/usr/bin/perl -sw
+
+# http://democracy.newcastle.gov.uk/mgElectionElectionAreaResults.aspx?Page=all&EID=6&RPID=4231550
+
+$proxy = 'http://YOURPROXYHERE:8080/';
+
+use WWW::Mechanize;
+use Storable;
+
+$url = 'http://democracy.newcastle.gov.uk/mgElectionElectionAreaResults.aspx?Page=all&EID=6&RPID=4231550';
+$m = WWW::Mechanize->new();
+$m->proxy(['http', 'https'], $proxy);
+$m->get($url);
+
+my $c = $m->content;
+
+my @links = $m->find_all_links(url_regex => qr/mgElectionAreaResults.aspx/);
+
+foreach my $link (@links) {
+        # print "LINK\t", $link->url_abs, "\n";
+        $url = $link->url_abs;
+        $m->get($url);
+        $c = $m->content;
+        $c =~ m{<table class="mgStatsTable tablesorter"  summary="Table of results for Wards ">(.*?)</table>}s or die "Can't find results table\n";
+        my $table = $1;
+        $table =~ m{<caption  class="mgSectionTitle" >(.*?) - results</caption>}gs;
+        my $ward = $1;
+        print "\nWARD $ward\n";
+        @outer = $table =~ m{<tr.*?>(.*?)</tr>}gs;
+        shift @outer;
+        foreach $row (@outer) {
+                # print "ROW $row\n";
+                @items = $row =~ m{<td.*?>(.*?)</td>}gs;
+                foreach $item (@items) {
+                        $item =~ s{^<span.*?>.*?</span>\s+}{};
+                        $item =~ s{^<a.*?>}{};
+                        $item =~ s{</a>\s*}{};
+                        print "$item\t";
+                }
+                print "\n";
+        }
+        # print $table;
+}
